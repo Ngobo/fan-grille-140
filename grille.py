@@ -7,10 +7,12 @@
 
 Модель стоит лицевой стороной на z = 0 (так её и печатать), втулка смотрит вверх.
 """
+import ctypes
 import math
 import sys
 from pathlib import Path
 
+import lib3mf
 import numpy as np
 import trimesh
 from manifold3d import CrossSection, Manifold, Mesh, triangulate
@@ -192,12 +194,28 @@ def to_trimesh(m: Manifold) -> trimesh.Trimesh:
     )
 
 
+def export_3mf(mesh: trimesh.Trimesh, path: Path, name: str):
+    """3MF через lib3mf — эталонную библиотеку консорциума 3MF.
+    Экспорт trimesh пишет атрибуты расширения Production, на которых
+    lib3mf в строгом режиме падает с «Invalid Attribute in namespace»."""
+    w = lib3mf.get_wrapper()
+    model = w.CreateModel()
+    model.SetUnit(lib3mf.ModelUnit.MilliMeter)
+    obj = model.AddMeshObject()
+    obj.SetName(name)
+    verts = [lib3mf.Position((ctypes.c_float * 3)(*v)) for v in mesh.vertices.tolist()]
+    tris = [lib3mf.Triangle((ctypes.c_uint32 * 3)(*f)) for f in mesh.faces.tolist()]
+    obj.SetGeometry(verts, tris)
+    model.AddBuildItem(obj, w.GetIdentityTransform())
+    model.QueryWriter("3mf").WriteToFile(str(path))
+
+
 def main():
     here = Path(__file__).parent
     for style in sys.argv[1:] or STYLES:
         mesh = to_trimesh(build(style))
         mesh.export(here / f"grille_140_{style}.stl")
-        mesh.export(here / f"grille_140_{style}.3mf")
+        export_3mf(mesh, here / f"grille_140_{style}.3mf", f"grille_140_{style}")
         print(f"{style}: watertight={mesh.is_watertight}  volume={mesh.volume / 1000:.1f} см³  "
               f"bounds={mesh.extents.round(2)}  open={open_share(style):.0%}")
 

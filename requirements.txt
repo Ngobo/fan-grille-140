@@ -3,3 +3,4 @@ trimesh
 numpy
 lxml
 networkx
+lib3mf
