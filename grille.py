@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import trimesh
-from manifold3d import CrossSection, Manifold
+from manifold3d import CrossSection, Manifold, Mesh, triangulate
 
 # --- Параметры, мм ---------------------------------------------------------
 HOLE_D = 140.0          # диаметр отверстия в ДСП
@@ -26,6 +26,7 @@ CHAMFER = 0.6           # фаска на лицевой кромке фланц
 
 HUB_D = 40.0            # центральный диск (мотор P14 — Ø50)
 RIB = 1.6               # толщина рёбер и перемычек
+RIB_CHAMFER = 0.4       # фаска по кромкам щелей с обеих сторон (0 — без фаски)
 
 # Вариант A
 RINGS = 6               # число кольцевых щелей
@@ -71,8 +72,43 @@ def sleeve() -> Manifold:
 
 def plate(openings: CrossSection) -> Manifold:
     """Фланец и решётка одной пластиной; щели прорезаны насквозь с запасом по z."""
-    cut = Manifold.extrude(openings, FLANGE_T + 2).translate((0, 0, -1))
-    return disk() - cut
+    return disk() - chamfered_cut(openings)
+
+
+def chamfered_cut(openings: CrossSection) -> Manifold:
+    """Тело выреза щелей с фаской 45° по кромкам на обеих сторонах решётки.
+
+    Каждая щель — отдельная призма: на лицевых сторонах её контур раздвинут на
+    RIB_CHAMFER по биссектрисам углов, в толще пластины он равен самой щели.
+    """
+    c = RIB_CHAMFER
+    if c <= 0:
+        return Manifold.extrude(openings, FLANGE_T + 2).translate((0, 0, -1))
+    layers = [(-1, c), (0, c), (c, 0), (FLANGE_T - c, 0), (FLANGE_T, c), (FLANGE_T + 1, c)]
+    prisms = [loft(np.asarray(part.to_polygons()[0]), layers) for part in openings.decompose()]
+    return Manifold.compose(prisms)
+
+
+def loft(poly: np.ndarray, layers) -> Manifold:
+    """Призма по контуру poly (против часовой стрелки) через слои (z, отступ наружу)."""
+    n = len(poly)
+    edge = np.roll(poly, -1, axis=0) - poly
+    normal = np.stack([edge[:, 1], -edge[:, 0]], axis=1)
+    normal /= np.linalg.norm(normal, axis=1, keepdims=True)
+    prev = np.roll(normal, 1, axis=0)
+    miter = (normal + prev) / (1 + np.sum(normal * prev, axis=1, keepdims=True))
+
+    verts = np.vstack([np.column_stack([poly + miter * d, np.full(n, z)]) for z, d in layers])
+    j = np.arange(n)
+    tris = []
+    for i in range(len(layers) - 1):
+        a, b = i * n + j, i * n + (j + 1) % n
+        top_a, top_b = a + n, b + n
+        tris += [np.stack([a, b, top_b], 1), np.stack([a, top_b, top_a], 1)]
+    cap = triangulate([poly])
+    tris += [cap[:, ::-1], cap + (len(layers) - 1) * n]
+    mesh = Mesh(vert_properties=verts.astype(np.float32), tri_verts=np.vstack(tris).astype(np.uint32))
+    return Manifold(mesh)
 
 
 def slots_rings() -> CrossSection:
