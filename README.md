@@ -4,8 +4,8 @@
 
 | A — «Кольца» | B — «Вихрь» |
 |---|---|
-| ![Вариант A](preview_A.png) | ![Вариант B](preview_B.png) |
-| [grille_140_A.3mf](grille_140_A.3mf) · [STL](grille_140_A.stl) | [grille_140_B.3mf](grille_140_B.3mf) · [STL](grille_140_B.stl) |
+| ![Вариант A](A-rings/preview.png) | ![Вариант B](B-swirl/preview.png) |
+| папка [A-rings](A-rings/) | папка [B-swirl](B-swirl/) |
 | открыто 72% проёма | открыто 70% проёма |
 
 На превью решётка показана со стороны втулки, то есть так, как она стоит на столе принтера.

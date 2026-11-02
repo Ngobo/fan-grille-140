@@ -3,7 +3,7 @@
 Запуск:  .venv/bin/python grille.py [A] [B]   (без аргументов — оба варианта)
   A — «Кольца»: концентрические щели с перемычками в шахматном порядке
   B — «Вихрь»: изогнутые лучи и два кольца жёсткости
-Результат: grille_140_<вариант>.3mf и .stl рядом со скриптом.
+Результат: <папка варианта>/grille_140_<вариант>.3mf и .stl
 
 Модель стоит лицевой стороной на z = 0 (так её и печатать), втулка смотрит вверх.
 """
@@ -173,6 +173,7 @@ def spoke(ra: float, rb: float, a0: float) -> CrossSection:
 
 
 STYLES = {"A": slots_rings, "B": slots_swirl}
+FOLDERS = {"A": "A-rings", "B": "B-swirl"}
 
 
 def build(style: str) -> Manifold:
@@ -213,9 +214,11 @@ def export_3mf(mesh: trimesh.Trimesh, path: Path, name: str):
 def main():
     here = Path(__file__).parent
     for style in sys.argv[1:] or STYLES:
+        out = here / FOLDERS[style]
+        out.mkdir(exist_ok=True)
         mesh = to_trimesh(build(style))
-        mesh.export(here / f"grille_140_{style}.stl")
-        export_3mf(mesh, here / f"grille_140_{style}.3mf", f"grille_140_{style}")
+        mesh.export(out / f"grille_140_{style}.stl")
+        export_3mf(mesh, out / f"grille_140_{style}.3mf", f"grille_140_{style}")
         print(f"{style}: watertight={mesh.is_watertight}  volume={mesh.volume / 1000:.1f} см³  "
               f"bounds={mesh.extents.round(2)}  open={open_share(style):.0%}")
 
